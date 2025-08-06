@@ -1,0 +1,61 @@
+version: '3.9'
+services:
+  mongo:
+    image: mongo:6
+    container_name: mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    command: ["--replSet", "rs0"]
+    restart: unless-stopped
+
+  nodeapp:
+    build: ./nodeapp
+    container_name: nodeapp
+    ports:
+      - "3000:3000"
+    environment:
+      - RABBITMQ_URL=amqp://admin:rabbit_pass_2025@rabbitmq
+    depends_on:
+      - mongo
+      - rabbitmq
+    restart: unless-stopped
+ 
+  consumer:
+    build: ./nodeapp
+    container_name: consumer
+    command: node consumer.js
+    environment:
+      - RABBITMQ_URL=amqp://admin:rabbit_pass_2025@rabbitmq
+      - MONGODB_URL=mongodb://mongo:27017
+    depends_on:
+      - rabbitmq
+      - mongo
+    restart: unless-stopped
+
+  forwarder:
+    build: ./nodeapp
+    container_name: forwarder
+    command: node forwarder.js
+    environment:
+      - MONGO_URL=mongodb://mongo:27017
+      - CLIENT_ENDPOINT=https://api.oddsnotify.co.uk/SMS/US_1/webhook
+    depends_on:
+      - mongo
+    restart: unless-stopped
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      - RABBITMQ_DEFAULT_USER=admin
+      - RABBITMQ_DEFAULT_PASS=rabbit_pass_2025
+    restart: unless-stopped
+
+volumes:
+  mongo_data:
+
